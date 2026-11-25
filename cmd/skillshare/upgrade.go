@@ -174,12 +174,20 @@ func upgradeCLIBinary(dryRun, force bool) (string, error) {
 		return runBrewUpgrade(start)
 	}
 
-	// Get latest version from GitHub
+	// Get the latest version from where this install updates: PyPI for a
+	// wheel, GitHub otherwise.
 	spinner := ui.StartSpinner("Checking latest version...")
-	release, err := fetchLatestRelease()
+	var latestVersion string
+	if method.IsPyPI() {
+		latestVersion, err = fetchPyPILatestVersion()
+	} else {
+		var release *versionpkg.Release
+		if release, err = fetchLatestRelease(); err == nil {
+			latestVersion = release.Version
+		}
+	}
 	spinner.Stop()
 
-	var latestVersion string
 	if err != nil {
 		// API failed - try to use cached version
 		cachedVersion := versionpkg.GetCachedVersion()
@@ -188,8 +196,6 @@ func upgradeCLIBinary(dryRun, force bool) (string, error) {
 			return "", nil
 		}
 		latestVersion = cachedVersion
-	} else {
-		latestVersion = release.Version
 	}
 
 	// --force reinstalls the same version, which only skillshare's own installs can do.
