@@ -40,6 +40,13 @@ func detectPyPIMethod(execPath string) (InstallMethod, bool) {
 	if _, err := os.Stat(filepath.Join(prefix, "uv-receipt.toml")); err == nil {
 		return InstallUV, true
 	}
+	// uvx runs a tool from an environment two levels inside uv's cache, and uv
+	// tags the cache root with CACHEDIR.TAG. A uv venv tags only itself.
+	// ponytail: assumes uv's <cache>/archive-v0/<id> depth; a deeper layout
+	// falls back to pip, as before.
+	if _, err := os.Stat(filepath.Join(filepath.Dir(filepath.Dir(prefix)), "CACHEDIR.TAG")); err == nil {
+		return InstallUVX, true
+	}
 	// pipx records each app it installs in that app's environment, wherever
 	// PIPX_HOME points.
 	if _, err := os.Stat(filepath.Join(prefix, "pipx_metadata.json")); err == nil {

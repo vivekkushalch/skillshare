@@ -33,6 +33,9 @@ func pythonTree(t *testing.T, files map[string]string) string {
 
 const distInfo = "skillshare_cli-0.31.0.dist-info/"
 
+// cacheDirTag is what uv writes into its cache root and into each environment.
+const cacheDirTag = "Signature: 8a477f597d28d172789f06886806bc55\n"
+
 func TestDetectInstallMethodPyPI(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -46,12 +49,23 @@ func TestDetectInstallMethodPyPI(t *testing.T) {
 			"tools/skillshare-cli/uv-receipt.toml":                          "[tool]\n",
 			"tools/skillshare-cli/lib/python3.12/site-packages/" + distInfo: "",
 		}, want: InstallUV},
-		// uv venv writes the same pyvenv.cfg as uv tool; only a tool has a receipt.
+		// uv venv writes the same pyvenv.cfg and CACHEDIR.TAG as uv tool; only a
+		// tool has a receipt.
 		{name: "uv pip in a uv venv", exec: ".venv/bin/skillshare", files: map[string]string{
 			".venv/bin/skillshare":                           "binary",
 			".venv/pyvenv.cfg":                               "home = /usr/bin\nuv = 0.9.26\n",
+			".venv/CACHEDIR.TAG":                             cacheDirTag,
 			".venv/lib/python3.12/site-packages/" + distInfo: "",
 		}, want: InstallPip},
+		// uvx runs the tool from an environment inside uv's cache, whose root
+		// carries the cache's own CACHEDIR.TAG.
+		{name: "uvx from the uv cache", exec: "uv-cache/archive-v0/x1/bin/skillshare", files: map[string]string{
+			"uv-cache/CACHEDIR.TAG":                                           cacheDirTag,
+			"uv-cache/archive-v0/x1/bin/skillshare":                           "binary",
+			"uv-cache/archive-v0/x1/pyvenv.cfg":                               "home = /usr/bin\nuv = 0.9.26\n",
+			"uv-cache/archive-v0/x1/CACHEDIR.TAG":                             cacheDirTag,
+			"uv-cache/archive-v0/x1/lib/python3.12/site-packages/" + distInfo: "",
+		}, want: InstallUVX},
 		{name: "pipx", exec: "pipx/venvs/skillshare-cli/bin/skillshare", files: map[string]string{
 			"pipx/venvs/skillshare-cli/bin/skillshare":                           "binary",
 			"pipx/venvs/skillshare-cli/pyvenv.cfg":                               "home = /usr/bin\n",
@@ -116,6 +130,7 @@ func TestPyPIUpgradeCommands(t *testing.T) {
 		InstallUV:   "uv tool upgrade skillshare-cli",
 		InstallPipx: "pipx upgrade skillshare-cli",
 		InstallPip:  "pip install --upgrade skillshare-cli",
+		InstallUVX:  "uvx --from skillshare-cli@latest skillshare",
 	}
 	for method, want := range commands {
 		if got := method.UpgradeCommand(); got != want {
@@ -125,7 +140,7 @@ func TestPyPIUpgradeCommands(t *testing.T) {
 			t.Errorf("%v.IsPyPI() = false, want true", method)
 		}
 	}
-	for _, method := range []InstallMethod{InstallNix, InstallNixProfile, InstallUV, InstallPipx, InstallPip} {
+	for _, method := range []InstallMethod{InstallNix, InstallNixProfile, InstallUV, InstallPipx, InstallPip, InstallUVX} {
 		if !method.IsPackageManaged() {
 			t.Errorf("%v.IsPackageManaged() = false, want true", method)
 		}

@@ -20,6 +20,7 @@ const (
 	InstallUV                              // PyPI wheel, from uv tool install
 	InstallPipx                            // PyPI wheel, from pipx install
 	InstallPip                             // PyPI wheel, from pip install
+	InstallUVX                             // PyPI wheel, run by uvx from the uv cache
 )
 
 // NixConfigUpgradeHint tells a user whose Nix configuration provides
@@ -43,6 +44,9 @@ func (m InstallMethod) UpgradeCommand() string {
 		return "pipx upgrade " + pypiPackage
 	case InstallPip:
 		return "pip install --upgrade " + pypiPackage
+	case InstallUVX:
+		// uvx keeps reusing its cached version until asked for the latest.
+		return "uvx --from " + pypiPackage + "@latest skillshare"
 	}
 	return "skillshare upgrade"
 }
@@ -61,9 +65,9 @@ func (m InstallMethod) IsNix() bool {
 	return m == InstallNix || m == InstallNixProfile
 }
 
-// IsPyPI reports whether pip, uv or pipx installed the binary from a wheel.
+// IsPyPI reports whether pip, uv, uvx or pipx installed the binary from a wheel.
 func (m InstallMethod) IsPyPI() bool {
-	return m == InstallUV || m == InstallPipx || m == InstallPip
+	return m == InstallUV || m == InstallPipx || m == InstallPip || m == InstallUVX
 }
 
 // IsPackageManaged reports whether a package manager owns the binary, so

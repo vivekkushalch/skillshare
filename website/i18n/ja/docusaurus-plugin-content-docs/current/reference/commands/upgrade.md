@@ -77,9 +77,10 @@ NixOS、Home Manager、overlay の設定で skillshare を提供している場�
 uv、pipx、pip でインストールした場合、`skillshare upgrade` は CLI を更新しません。インストーラーがインストール済みのバージョンを記録しており、バイナリを置き換えるとその記録が食い違うためです。新しいバージョンがある場合は、代わりにインストーラーの更新コマンドを表示します。
 
 ```bash
-uv tool upgrade skillshare-cli        # uv
-pipx upgrade skillshare-cli           # pipx
-pip install --upgrade skillshare-cli  # pip
+uv tool upgrade skillshare-cli               # uv
+pipx upgrade skillshare-cli                  # pipx
+pip install --upgrade skillshare-cli         # pip
+uvx --from skillshare-cli@latest skillshare  # uvx
 ```
 
 ダッシュボードの更新ボタンも同じ案内を表示します。`skillshare upgrade --skill` は引き続き組み込みの Skill を更新します。
