@@ -1,6 +1,8 @@
 package version
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -149,5 +151,39 @@ func TestPyPIUpgradeCommands(t *testing.T) {
 		if method.IsPackageManaged() || method.IsPyPI() {
 			t.Errorf("%v: IsPackageManaged() = %v, IsPyPI() = %v; want false, false", method, method.IsPackageManaged(), method.IsPyPI())
 		}
+	}
+}
+
+func TestLatestVersionForPyPIAsksPyPI(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(`{"info": {"version": "0.31.0"}, "releases": {}}`))
+	}))
+	defer srv.Close()
+	old := pypiJSONURL
+	pypiJSONURL = srv.URL
+	t.Cleanup(func() { pypiJSONURL = old })
+
+	for _, method := range []InstallMethod{InstallUV, InstallPipx, InstallPip, InstallUVX} {
+		if got, err := latestVersionFor(method); err != nil || got != "0.31.0" {
+			t.Errorf("latestVersionFor(%v) = %q, %v; want PyPI's 0.31.0", method, got, err)
+		}
+	}
+}
+
+func TestFetchPyPILatestVersionFailsWithoutAVersion(t *testing.T) {
+	for name, handler := range map[string]http.HandlerFunc{
+		"not found":  func(w http.ResponseWriter, r *http.Request) { http.NotFound(w, r) },
+		"no version": func(w http.ResponseWriter, r *http.Request) { w.Write([]byte(`{"info": {}}`)) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			srv := httptest.NewServer(handler)
+			defer srv.Close()
+			old := pypiJSONURL
+			pypiJSONURL = srv.URL
+			t.Cleanup(func() { pypiJSONURL = old })
+			if got, err := FetchPyPILatestVersion(); err == nil {
+				t.Fatalf("FetchPyPILatestVersion() = %q, want an error", got)
+			}
+		})
 	}
 }

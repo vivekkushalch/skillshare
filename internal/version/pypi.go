@@ -1,14 +1,58 @@
 package version
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // pypiPackage is the PyPI distribution that ships the skillshare binary as a
 // wheel, and the name the upgrade commands use.
 const pypiPackage = "skillshare-cli"
+
+// pypiJSONURL is PyPI's JSON API for the package. Tests point it at a fake.
+var pypiJSONURL = "https://pypi.org/pypi/" + pypiPackage + "/json"
+
+// FetchPyPILatestVersion returns the newest skillshare-cli on PyPI. A PyPI
+// install can only upgrade to what PyPI has, and a release reaches PyPI after
+// GitHub marks it latest, so these installs ask PyPI, as Homebrew installs
+// ask Homebrew.
+func FetchPyPILatestVersion() (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pypiJSONURL, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("network error: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("PyPI returned %d", resp.StatusCode)
+	}
+	var doc struct {
+		Info struct {
+			Version string `json:"version"`
+		} `json:"info"`
+	}
+	// The document lists every release's files, so allow it room to grow.
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 32<<20)).Decode(&doc); err != nil {
+		return "", fmt.Errorf("failed to parse PyPI response: %w", err)
+	}
+	if doc.Info.Version == "" {
+		return "", fmt.Errorf("no version found on PyPI")
+	}
+	return doc.Info.Version, nil
+}
 
 // pypiSitePackages are where an installer puts a wheel's metadata, relative to
 // the prefix whose bin (Scripts on Windows) holds the binary: POSIX venvs and

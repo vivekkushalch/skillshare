@@ -117,8 +117,9 @@ func cmdUpgrade(args []string) error {
 
 // Swapped in tests to fake the install location and the latest release.
 var (
-	upgradeExecPath    = resolveExecPath
-	fetchLatestRelease = versionpkg.FetchLatestRelease
+	upgradeExecPath        = resolveExecPath
+	fetchLatestRelease     = versionpkg.FetchLatestRelease
+	fetchPyPILatestVersion = versionpkg.FetchPyPILatestVersion
 )
 
 // upgradeRowWidth lines up the CLI and Skill rows.
